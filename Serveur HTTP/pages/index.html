@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+    <head>  
+        <meta charset="UTF-8" />
+        <title>Mini Web Server</title>
+        <style>
+            input#request {
+                width: 300px;
+            }
+            div.server-response-container {
+                margin-top: 30px;
+                display: flex;
+                flex-direction: column;
+                width: 80%;
+            }
+            div.data-container {
+                display: none;
+                margin: 20px 0px;
+            }
+
+            img#response-img {
+                max-width: 500px;
+                display: none;
+            }
+
+            embed#response-pdf {
+                width: 500px;
+                height: 400px;
+                display: none;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Welcome to the Ultra Mini-WebServer</h1>
+        <div>
+            <span>Send request to server: </span>
+            <select name="type" id="request-type">
+                <option selected value="GET">GET</option>
+                <option value="POST">POST</option>
+                <option value="PUT">PUT</option>
+                <option value="DELETE">DELETE</option>
+                <option value="HEAD">HEAD</option>
+            </select>
+            <input type="text" name="Request" placeholder="Type your request here" id="request" />
+            <button id="send-request">Send</button>
+            <div class="data-container">
+                <textarea id="data" name="Data" rows="10" cols="70" placeholder="Data to send"></textarea>
+            </div>
+        </div>
+        <div class="server-response-container">
+            <h3>Server response: </h3>
+            <div>
+                <span style="font-weight: bold;">Response header: </span>
+                <p id="response-header"></p>
+            </div>
+            <div style="display: flex; flex-direction: column;">
+                <span style="font-weight: bold;">Response content: </span>
+                <code id="response-content"></code>
+                <img src="" frameborder="0" id="response-img">
+                <embed src="" type="application/pdf" id="response-pdf">
+            </div>
+        </div>
+        <script>
+            const serverAddress = "http://localhost:3000/";
+
+            document.getElementById("request-type").addEventListener("change", function () {
+                document.getElementById("request").value = "";
+                document.getElementById("response-header").innerHTML = "";
+                document.getElementById("response-content").innerHTML = "";
+                document.getElementById("data").value = "";
+                if (this.value == "POST" || this.value == "PUT") {
+                    document.querySelector("div.data-container").style.display = "block";
+                } else {
+                    document.querySelector("div.data-container").style.display = "none";
+                }
+                document.getElementById("response-img").style.display = "none";
+                document.getElementById("response-pdf").style.display = "none";
+                document.getElementById("response-content").style.display = "none";
+
+            });
+
+            document.getElementById("send-request").addEventListener("click", async () => {
+                document.getElementById("response-header").innerHTML = "Sending ...";
+                document.getElementById("response-content").innerHTML = "";
+
+                const type = document.getElementById("request-type").value;
+                const request = document.getElementById("request").value;
+                let requestProp = {method: type};
+                if ((type === "POST" || type === "PUT")) {
+                    requestProp.body = document.getElementById("data").value + "\0";
+                }
+
+                
+                fetch(serverAddress + request, requestProp).then((response) => {
+                    //Get response headers
+                    let header = "status: " + response.status + " " + response.statusText + "<br/>";
+                    for (let pair of response.headers.entries()) {
+                        header += pair[0] + ": " + pair[1] + "<br/>";
+                    }
+                    document.getElementById("response-header").innerHTML = header;
+
+                    const contentType = response.headers.get("Content-Type");
+                    if (contentType.includes("text")) {
+                        document.getElementById("response-img").style.display = "none";
+                        document.getElementById("response-pdf").style.display = "none";
+                        document.getElementById("response-content").style.display = "block";
+                        response.text().then((text) => {
+                            let content = text;
+                            if (contentType.includes("html")) {
+                                content = content.replaceAll("<", "&lt;");
+                                content = content.replaceAll(">", "&gt;");
+                                content = "<pre>" + content + "</pre>";
+                            } else {
+                                content = content.replaceAll("\n", "<br/>");
+                            }
+                            document.getElementById("response-content").innerHTML = content;
+                        });
+                    } else if (contentType.includes("image")) {
+                        document.getElementById("response-img").style.display = "block";
+                        document.getElementById("response-pdf").style.display = "none";
+                        document.getElementById("response-content").style.display = "none";
+                        response.blob().then((blob) => {
+                            const imgUrl = URL.createObjectURL(blob);
+                            document.getElementById("response-img").src = imgUrl;
+                        });
+                    } else if (contentType.includes("pdf")) {
+                        document.getElementById("response-img").style.display = "none";
+                        document.getElementById("response-pdf").style.display = "block";
+                        document.getElementById("response-content").style.display = "none";
+                        response.blob().then((blob) => {
+                            const pdfUrl = URL.createObjectURL(blob);
+                            document.getElementById("response-pdf").src = pdfUrl;
+                        });
+                    } 
+                }).catch((err) => {
+                    console.log(err);
+                });
+            });
+
+        </script>
+    </body>
+</html>
